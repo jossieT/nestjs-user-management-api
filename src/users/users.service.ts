@@ -122,6 +122,9 @@ export class UsersService {
     }  
   }
 
+  async get(id: string) {
+    
+  }
 
   async  remove(id: string) {
     try {

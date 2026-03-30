@@ -4,7 +4,7 @@ import { UsersService } from './users.service';
 import { CreateUserDto } from './dto/create-user.dto';
 import { UpdateUserDto } from './dto/update-user.dto';
 import { AuthGuard } from '@nestjs/passport';
-import { RolesGuard } from 'src/auth/guards/roles.guard';
+import { RolesGuard } from '../auth/guards/roles.guard';
 import { Role } from '@prisma/client';
 import { Roles } from 'src/auth/decorators/roles.decorator';
 
@@ -16,34 +16,47 @@ export class UsersController {
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.ADMIN)
   create(@Body() createUserDto: CreateUserDto) {
     return this.usersService.create(createUserDto);
   }
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles(Role.ADMIN, Role.SUPER_ADMIN)
+  @Roles(Role.ADMIN)
   findAll() {
     return this.usersService.findAll();
   }
 
   @Get(':id')
-   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  findOne(@Param('id') id: string) {
-    return this.usersService.findOne(id);
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  async findOne(@Param('id') id: string, @Request() req) {
+    const user = req.user; // { userId, mobileNumber, role }
+    // Allow if admin/super admin OR the ID matches the authenticated user's ID
+    if (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN || user.userId === id) {
+      return this.usersService.findOne(id);
+    }
+    throw new ForbiddenException('You don\'t have access to perform this action');
   }
 
   @Patch(':id')
-  @UseGuards(AuthGuard('jwt'))
-  update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto) {
-    return this.usersService.update(id, updateUserDto);
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  async update(@Param('id') id: string, @Body() updateUserDto: UpdateUserDto, @Request() req) {
+    const user = req.user
+    if (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN || user.userId === id){
+        return this.usersService.update(id, updateUserDto);
+    }
+    throw new ForbiddenException('You don\'t have access to perform this action')
   }
 
   @Delete(':id')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  remove(@Param('id') id: string) {
-    return this.usersService.remove(id);
+  async remove(@Param('id') id: string, @Request() req) {
+    const user = req.user;
+    if (user.role === Role.ADMIN || user.role === Role.SUPER_ADMIN || user.userId == id){
+        return this.usersService.remove(id);
+    }
+    throw new ForbiddenException('You can only delete your own profile');
   }
 
   @Get('profile')
